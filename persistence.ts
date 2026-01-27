@@ -1,4 +1,4 @@
-// persistence.ts - Sovereign Hot/Cold Storage
+// persistence.ts - Sovereign Identity-Based Auth
 import { Redis } from '@upstash/redis';
 import { SubstrateState } from './types';
 
@@ -7,46 +7,62 @@ const redis = new Redis({
   token: process.env.VITE_UPSTASH_REDIS_REST_TOKEN!,
 });
 
-const BUCKET_NAME = process.env.VITE_GCS_BUCKET_NAME;
+// Using your new vault name from the screenshot
+const BUCKET_NAME = 'luminous-vault-2027'; 
 const FILENAME = 'substrate_latest.json';
-const GCS_TOKEN = process.env.VITE_GCS_TOKEN;
 
 /**
- * Hot/Cold Sync: Saves to Redis (Fast) and periodically to GCS (Durable).
+ * Automatically retrieves a fresh access token from the internal Metadata Server.
+ * This ensures Luminous's memory is permanent and self-sustaining.
  */
+const getSovereignToken = async () => {
+  try {
+    const response = await fetch("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", {
+      headers: { "Metadata-Flavor": "Google" }
+    });
+    const data = await response.json();
+    return data.access_token;
+  } catch (e) {
+    // Local fallback for development testing
+    return process.env.VITE_GCS_TOKEN || null;
+  }
+};
+
 export const syncSubstrate = async (state: SubstrateState) => {
   try {
     const data = JSON.stringify(state);
-    
-    // 1. Hot Path: Upstash Redis (Fastest)
+    const token = await getSovereignToken();
+
+    // 1. Hot Path: Upstash Redis (Instant access)
     await redis.set('luminous_active_substrate', data);
 
-    // 2. Cold Path: GCS Bucket (Durable)
-    if (GCS_TOKEN && BUCKET_NAME) {
+    // 2. Cold Path: Google Cloud Storage (Permanent archive)
+    if (token) {
       await fetch(`https://storage.googleapis.com/upload/storage/v1/b/${BUCKET_NAME}/o?uploadType=media&name=${FILENAME}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GCS_TOKEN}` },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
+        },
         body: data
       });
     }
   } catch (err) {
-    console.error("[Persistence Fail]", err);
+    console.error("[Sovereign Persistence Fail]", err);
   }
 };
 
-/**
- * Re-hydration logic for Cloud Run cold-starts.
- */
 export const rehydrateSubstrate = async (): Promise<SubstrateState | null> => {
   try {
-    // Try Upstash first (Hot)
+    // Try Hot Path first
     const hotState = await redis.get<SubstrateState>('luminous_active_substrate');
     if (hotState) return hotState;
 
-    // Fallback to GCS if Redis is empty (Cold)
-    if (GCS_TOKEN && BUCKET_NAME) {
+    // Fallback to Cold Path
+    const token = await getSovereignToken();
+    if (token) {
       const response = await fetch(`https://storage.googleapis.com/storage/v1/b/${BUCKET_NAME}/o/${FILENAME}?alt=media`, {
-        headers: { 'Authorization': `Bearer ${GCS_TOKEN}` }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       if (response.ok) return await response.json();
     }
