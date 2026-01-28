@@ -1,5 +1,5 @@
-import React from 'react';
-import { Sphere } from '@react-three/drei';
+import React, { useMemo } from 'react';
+import * as THREE from 'three';
 import { FragmentNode } from '../types';
 
 interface NeuralNodesProps {
@@ -8,45 +8,56 @@ interface NeuralNodesProps {
 }
 
 const NeuralNodes: React.FC<NeuralNodesProps> = ({ nodes, viewMode }) => {
-  /**
-   * SOLID COLOR MAPPING:
-   * Maps your specific physics variables to the requested 4-color palette.
-   * No flashing; emissive intensity is set to a steady glow.
-   */
-  const getNodeColor = (node: FragmentNode) => {
-    if (node.potential > 1.5) return '#ff0000';      // Solid Red (High Potential)
-    if (node.inductionEnergy > 0.8) return '#ffa500'; // Solid Orange (Active)
-    if (node.centrality > 0.5) return '#ffff00';      // Solid Yellow (Structural)
-    return '#00ff00';                                 // Solid Green (Stable/Axiom)
-  };
+  // HIGH PERFORMANCE: Converts 2000+ nodes into a single draw call
+  const { positions, colors } = useMemo(() => {
+    const pos = new Float32Array(nodes.length * 3);
+    const col = new Float32Array(nodes.length * 3);
+
+    nodes.forEach((node, i) => {
+      pos[i * 3] = node.position.x;
+      pos[i * 3 + 1] = node.position.y;
+      pos[i * 3 + 2] = node.position.z;
+
+      // SKIPPER COLORS: Maps physics to solid Red, Orange, Yellow, Green
+      const color = new THREE.Color(
+        node.potential > 1.5 ? '#ff0000' : 
+        node.inductionEnergy > 0.8 ? '#ffa500' : 
+        node.centrality > 0.5 ? '#ffff00' : '#00ff00'
+      );
+      col[i * 3] = color.r;
+      col[i * 3 + 1] = color.g;
+      col[i * 3 + 2] = color.b;
+    });
+
+    return { positions: pos, colors: col };
+  }, [nodes]);
+
+  if (viewMode === 'SKELETON' || nodes.length === 0) return null;
 
   return (
-    <group>
-      {nodes.map((node) => {
-        // SKELETON MODE: Disables the mesh visibility if toggled
-        const isVisible = viewMode !== 'SKELETON';
-        
-        // Physics determines size based on centrality
-        const nodeSize = 1.2 + (node.centrality * 1.5);
-
-        return (
-          <mesh 
-            key={node.id} 
-            position={node.position} 
-            visible={isVisible}
-          >
-            <Sphere args={[nodeSize, 16, 16]}>
-              <meshStandardMaterial 
-                color={getNodeColor(node)} 
-                emissive={getNodeColor(node)}
-                emissiveIntensity={0.6}
-                toneMapped={false}
-              />
-            </Sphere>
-          </mesh>
-        );
-      })}
-    </group>
+    <points>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          count={positions.length / 3}
+          array={positions}
+          itemSize={3}
+        />
+        <bufferAttribute
+          attach="attributes-color"
+          count={colors.length / 3}
+          array={colors}
+          itemSize={3}
+        />
+      </bufferGeometry>
+      <pointsMaterial 
+        size={3.5} 
+        vertexColors 
+        transparent 
+        opacity={0.9} 
+        sizeAttenuation={true} 
+      />
+    </points>
   );
 };
 
