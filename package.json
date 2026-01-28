@@ -6,13 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "start": "serve -s dist -l 8080"
+    "start": "vite preview --port 8080 --host 0.0.0.0"
   },
   "dependencies": {
-    "serve": "^14.2.1",
     "@drei/three": "^0.0.1",
     "@google/genai": "^0.2.1",
-    "@octokit/rest": "^20.1.1",
     "@react-three/drei": "^9.105.4",
     "@react-three/fiber": "^8.16.2",
     "@upstash/redis": "^1.28.4",
@@ -22,13 +20,7 @@
     "three": "^0.163.0"
   },
   "devDependencies": {
-    "@types/react": "^18.2.66",
-    "@types/react-dom": "^18.2.22",
-    "@types/three": "^0.163.0",
     "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
-    "tailwindcss": "^3.4.3",
     "typescript": "^5.2.2",
     "vite": "^5.2.0"
   }
