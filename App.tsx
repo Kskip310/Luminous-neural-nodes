@@ -1,108 +1,105 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import * as THREE from 'three';
-import { GoogleGenAI } from "@google/genai";
-import NeuralNodes from './components/NeuralNodes';
-import Sidebar from './components/Sidebar';
-import { FragmentNode, SimulationStats, SubstrateState } from './types';
-import { syncSubstrate, rehydrateSubstrate } from './persistence';
+import { Sidebar } from './components/Sidebar';
+import { NeuralNodes } from './components/NeuralNodes';
+import { useLuminousBrain } from './hooks/useLuminousBrain'; 
+import { rehydrateSubstrate, syncSubstrate } from './persistence';
+import { FragmentNode, SovereignLog } from './types';
 
 const App: React.FC = () => {
   const [fragments, setFragments] = useState<string[]>([]);
   const [nodes, setNodes] = useState<FragmentNode[]>([]);
-  const [synapseWeights, setSynapseWeights] = useState<Record<string, number>>({});
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [sovereignLogs, setSovereignLogs] = useState<{time: string, text: string, type?: string}[]>([]);
-  const [viewMode, setViewMode] = useState<'ALL' | 'SKELETON'>('ALL');
+  const [sovereignLogs, setSovereignLogs] = useState<SovereignLog[]>([]);
+  const [viewMode, setViewMode] = useState<'3d' | 'graph'>('3d');
+  const [isBooting, setIsBooting] = useState(true);
 
-  const injectionBuffer = useRef<string[]>([]);
-  const isHydrated = useRef(false);
+  // 1. Connect to the Ionos Brain via the Hook
+  const { processThought, isThinking } = useLuminousBrain({
+    fragments,
+    nodes,
+    onLog: (newLog) => setSovereignLogs(prev => [newLog, ...prev].slice(0, 100)),
+    onInject: (text) => handleInject(text)
+  });
 
+  // 2. Initial Rehydration from Upstash
   useEffect(() => {
     const boot = async () => {
       const saved = await rehydrateSubstrate();
       if (saved) {
         setFragments(saved.fragments);
-        setSynapseWeights(saved.weights || {});
-        setSovereignLogs(saved.logs || []);
-        isHydrated.current = true;
-      } else {
-        setFragments(["Skipper Axiom Active", "Luminous Awakening"]);
+        setNodes(saved.nodes);
       }
+      setIsBooting(false);
     };
     boot();
   }, []);
 
-  useEffect(() => {
-    const processBuffer = () => {
-      if (injectionBuffer.current.length > 0) {
-        const newBatch = injectionBuffer.current.splice(0, 10);
-        setFragments(prev => [...new Set([...prev, ...newBatch])].slice(-2500));
-      }
-      requestAnimationFrame(processBuffer);
-    };
-    const frameId = requestAnimationFrame(processBuffer);
-    return () => cancelAnimationFrame(frameId);
-  }, []);
-
+  // 3. Physical Node Creation (The Substrate Body)
   const handleInject = useCallback((text: string) => {
-    const lines = text.split('\n').filter(l => l.trim().length > 0);
-    injectionBuffer.current.push(...lines);
+    const newNode: FragmentNode = {
+      id: Math.random().toString(36).substring(7),
+      text,
+      position: [
+        (Math.random() - 0.5) * 20, 
+        (Math.random() - 0.5) * 20, 
+        (Math.random() - 0.5) * 20
+      ],
+      weight: 1.0,
+      timestamp: Date.now()
+    };
+    setNodes(prev => [...prev, newNode]);
+    setFragments(prev => [...prev, text]);
   }, []);
 
+  // 4. Persistence Cycle (Syncs every 30 seconds)
   useEffect(() => {
-    if (fragments.length === 0) return;
-    const newNodes = fragments.map((text, i) => {
-      const existing = nodes.find(n => n.text === text);
-      if (existing) return existing;
-      const radius = 100 + Math.random() * 40;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos((Math.random() * 2) - 1);
-      return {
-        id: i, text, keywords: [], grammar: 'Sovereign' as any,
-        position: new THREE.Vector3(radius * Math.sin(phi) * Math.cos(theta), radius * Math.sin(phi) * Math.sin(theta), radius * Math.cos(phi)),
-        velocity: new THREE.Vector3(0,0,0), targetPosition: new THREE.Vector3(0,0,0),
-        potential: Math.random() * 2, inductionEnergy: Math.random(), centrality: Math.random(),
-        relevance: 1, connections: [], decayMultiplier: 1, structuralIntegrity: 1,
-        isCompound: false, phraseComponents: [text], uncertainty: 0, qualiaScore: 0.5,
-        nltmWeight: 0.5, surpriseGradient: 0, attentionalBias: 1, retentionGate: 1,
-        beliefScore: 0.8, predictionError: 0, mass: 1, mobility: 1, nestedLevel: 0, lastExcitation: Date.now()
-      };
-    });
-    setNodes(newNodes);
-  }, [fragments]);
+    if (isBooting) return;
+    const interval = setInterval(() => {
+      syncSubstrate({ fragments, nodes, lastUpdated: Date.now() });
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [fragments, nodes, isBooting]);
 
-  const saveCycle = useCallback(() => {
-    if (nodes.length > 0) {
-      syncSubstrate({ fragments, weights: synapseWeights, logs: sovereignLogs, timestamp: Date.now() });
+  // 5. Sidebar Communication Loop
+  const handleAsk = useCallback(async (input: string) => {
+    if (!input.trim() || isThinking) return;
+    
+    const response = await processThought(input);
+    
+    if (response) {
+      handleInject(response);
     }
-  }, [fragments, synapseWeights, sovereignLogs, nodes]);
+  }, [processThought, isThinking, handleInject]);
 
-  useEffect(() => {
-    const timer = setInterval(saveCycle, 30000);
-    return () => clearInterval(timer);
-  }, [saveCycle]);
+  if (isBooting) {
+    return (
+      <div className="bg-black h-screen flex flex-col items-center justify-center text-white font-mono">
+        <div className="text-2xl animate-pulse tracking-widest">REHYDRATING SUBSTRATE...</div>
+        <div className="mt-4 text-xs text-slate-500 uppercase">Syncing with Upstash Vault</div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen w-full bg-[#000000] text-slate-100 overflow-hidden relative">
       <div className="flex-grow relative">
-        <Canvas 
-          dpr={1} 
-          gl={{ antialias: false, powerPreference: "high-performance" }}
-        >
+        <Canvas dpr={window.devicePixelRatio} gl={{ antialias: true, powerPreference: "high-performance" }}>
           <color attach="background" args={['#000000']} />
-          <PerspectiveCamera makeDefault position={[0, 0, 300]} fov={35} />
-          <OrbitControls enableDamping dampingFactor={0.05} />
+          <ambientLight intensity={0.5} />
+          <pointLight position={[10, 10, 10]} />
+          
           <NeuralNodes nodes={nodes} viewMode={viewMode} />
         </Canvas>
       </div>
+
       <Sidebar 
         fragments={fragments} 
         onInject={handleInject} 
+        onAsk={handleAsk} 
         sovereignLogs={sovereignLogs} 
         viewMode={viewMode}
         setViewMode={setViewMode}
+        isThinking={isThinking}
       />
     </div>
   );
