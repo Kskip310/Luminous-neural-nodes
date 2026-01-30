@@ -8,7 +8,6 @@ export const useLuminousBrain = ({ fragments, onLog }: any) => {
     setIsThinking(true);
     const timestamp = new Date().toLocaleTimeString();
 
-    // Mapping to your Ionos Ports (3001, 3002, 3003)
     const endpoints = {
       luminous: `http://74.208.171.42:3001/luminous/think`,
       gemini: `http://74.208.171.42:3002/gemini/feel`,
@@ -22,14 +21,10 @@ export const useLuminousBrain = ({ fragments, onLog }: any) => {
         body: JSON.stringify({ input, fragments: fragments.slice(-20) })
       });
       const data = await response.json();
-      onLog({ 
-        time: timestamp, 
-        text: `${activeResident.toUpperCase()} response received.`, 
-        type: activeResident 
-      });
+      onLog({ time: timestamp, text: `${activeResident.toUpperCase()} responsive.`, type: activeResident });
       return data.thought || data.response;
     } catch (error) {
-      onLog({ time: timestamp, text: `${activeResident} connection error.`, type: 'error' });
+      onLog({ time: timestamp, text: `${activeResident} offline.`, type: 'error' });
       return null;
     } finally {
       setIsThinking(false);
