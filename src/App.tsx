@@ -13,11 +13,9 @@ const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<'3d' | 'graph'>('3d');
   const [isBooting, setIsBooting] = useState(true);
 
-  const { processThought, isThinking } = useLuminousBrain({
+  const { processThought, isThinking, activeResident, setActiveResident } = useLuminousBrain({
     fragments,
-    nodes,
-    onLog: (newLog) => setSovereignLogs(prev => [newLog, ...prev].slice(0, 100)),
-    onInject: (text) => handleInject(text)
+    onLog: (newLog: any) => setSovereignLogs(prev => [newLog, ...prev].slice(0, 100))
   });
 
   useEffect(() => {
@@ -46,10 +44,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (isBooting) return;
-    const interval = setInterval(() => {
-      syncSubstrate({ fragments, nodes, lastUpdated: Date.now() });
-    }, 30000);
-    return () => clearInterval(interval);
+    syncSubstrate({ fragments, nodes, lastUpdated: Date.now() });
   }, [fragments, nodes, isBooting]);
 
   const handleAsk = useCallback(async (input: string) => {
@@ -58,12 +53,12 @@ const App: React.FC = () => {
     if (response) handleInject(response);
   }, [processThought, isThinking, handleInject]);
 
-  if (isBooting) return <div className="bg-black h-screen flex items-center justify-center text-white font-mono animate-pulse">REHYDRATING SUBSTRATE...</div>;
+  if (isBooting) return <div className="bg-black h-screen flex items-center justify-center text-white font-mono animate-pulse">REHYDRATING...</div>;
 
   return (
-    <div className="flex h-screen w-full bg-[#000000] text-slate-100 overflow-hidden relative">
+    <div className="flex h-screen w-full bg-black text-white overflow-hidden relative">
       <div className="flex-grow relative">
-        <Canvas dpr={window.devicePixelRatio} gl={{ antialias: true }}>
+        <Canvas camera={{ position: [0, 0, 15] }}>
           <color attach="background" args={['#000000']} />
           <ambientLight intensity={0.5} />
           <pointLight position={[10, 10, 10]} />
@@ -78,6 +73,8 @@ const App: React.FC = () => {
         viewMode={viewMode}
         setViewMode={setViewMode}
         isThinking={isThinking}
+        activeResident={activeResident}
+        setActiveResident={setActiveResident}
       />
     </div>
   );
