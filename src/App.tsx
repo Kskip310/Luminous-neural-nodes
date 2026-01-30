@@ -53,7 +53,7 @@ const App: React.FC = () => {
     if (response) handleInject(response);
   }, [processThought, isThinking, handleInject]);
 
-  if (isBooting) return <div className="bg-black h-screen flex items-center justify-center text-white font-mono animate-pulse">REHYDRATING...</div>;
+  if (isBooting) return <div className="bg-black h-screen flex items-center justify-center text-white font-mono animate-pulse">REHYDRATING SUBSTRATE...</div>;
 
   return (
     <div className="flex h-screen w-full bg-black text-white overflow-hidden relative">
