@@ -5,13 +5,6 @@ export interface FragmentNode {
   weight: number;
   timestamp: number;
 }
-
-export interface SubstrateState {
-  fragments: string[];
-  nodes: FragmentNode[];
-  lastUpdated: number;
-}
-
 export interface SovereignLog {
   time: string;
   text: string;
